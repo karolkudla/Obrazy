@@ -3,239 +3,165 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Układy prostokątów 50×70 cm – generator i edycja</title>
+<title>Układy prostokątów – wersja estetyczna</title>
 <style>
-  :root{
-    --bg:#0f1220; --panel:#14182a; --ink:#e9ecf1; --muted:#9aa3b2;
-    --accent:#7bd88f; --accent2:#78a6ff; --warn:#ffcd70;
-    --border:#262b43; --sel:#ffd166;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0; font-family: Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
-    background:linear-gradient(180deg,#0d1020 0%,#0b0e1a 100%); color:var(--ink);
-    min-height:100svh; display:flex; flex-direction:column; gap:16px;
-  }
-  header{padding:16px 20px; display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border); background:rgba(20,24,42,.6); backdrop-filter: blur(6px); position:sticky; top:0; z-index:10}
-  header h1{font-size:18px; margin:0; font-weight:700}
-  header .tag{font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted)}
-  main{display:grid; grid-template-columns: 360px 1fr; gap:18px; padding:16px 20px; align-items:start}
-  @media (max-width: 1100px){ main{grid-template-columns: 1fr} }
-  .panel{
-    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25);
-  }
-  .panel h2{font-size:14px; margin:0 0 10px 0; color:var(--muted); font-weight:600; letter-spacing:.2px}
-  label{font-size:13px; color:var(--muted)}
-  select, button{
-    background:#0f1324; color:var(--ink); border:1px solid var(--border);
-    border-radius:10px; padding:10px 12px; font-size:14px;
-  }
-  button{cursor:pointer; transition:.15s transform, .15s background}
-  button:hover{transform: translateY(-1px)}
-  .btn-accent{border-color:#2b7a4b; background:#15321f}
-  .btn-blue{border-color:#2b4f7a; background:#13263a}
-  .controls{display:flex; flex-wrap:wrap; gap:8px}
-  .row{display:flex; flex-direction:column; gap:6px; margin-bottom:10px}
-  .tiny{font-size:12px; color:var(--muted)}
-  .thumbs{
-    display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; max-height:320px; overflow:auto; padding-right:4px;
-  }
-  .thumb{
-    background:#0f1324; border:1px solid var(--border); border-radius:10px; padding:8px;
-    display:flex; flex-direction:column; gap:6px; cursor:pointer; transition:.15s box-shadow, .15s transform;
-  }
-  .thumb:hover{box-shadow:0 6px 16px rgba(0,0,0,.25); transform: translateY(-1px)}
-  .thumb canvas{width:100%; height:auto; display:block; background:#0b0f1f; border-radius:6px}
-  .thumb .meta{font-size:12px; color:var(--muted)}
-  .workspace{
-    display:grid; grid-template-rows:auto 1fr; gap:10px; min-height:400px;
-  }
-  .canvas-wrap{
-    background:#0b0f1f; border:1px dashed var(--border); border-radius:12px; padding:10px; position:relative;
-  }
-  canvas#main{display:block; width:100%; height:auto; image-rendering: crisp-edges}
-  .legend{display:flex; gap:12px; align-items:center; font-size:12px; color:var(--muted)}
-  .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border); border-radius:999px}
-  .sw{width:14px; height:10px; border:1px solid var(--border); border-radius:3px}
-  .sw.p{background:linear-gradient(180deg,#2a3c7a,#203060)}
-  .sw.l{background:linear-gradient(180deg,#2a7a52,#1e6242)}
-  .help{font-size:12px; color:var(--muted); line-height:1.5}
-  .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#101428; border:1px solid var(--border); border-radius:6px; padding:2px 6px; font-size:12px}
-  .flex{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#0d1020;color:#eee;display:flex;flex-direction:column;min-height:100vh}
+  header{padding:12px 20px;background:#14182a;border-bottom:1px solid #262b43;position:sticky;top:0}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  main{flex:1;display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
+  @media(max-width:1000px){main{grid-template-columns:1fr}}
+  .panel{background:#14182a;border:1px solid #262b43;border-radius:10px;padding:12px;overflow:auto}
+  .panel h2{font-size:14px;margin:0 0 10px 0;color:#aaa}
+  select,button{background:#0f1324;color:#eee;border:1px solid #333;border-radius:8px;padding:8px 10px;font-size:14px}
+  button{cursor:pointer}
+  .thumbs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-height:320px;overflow:auto}
+  .thumb{background:#0f1324;border:1px solid #333;border-radius:8px;padding:6px;cursor:pointer}
+  .thumb canvas{width:100%;height:auto;display:block}
+  .workspace{display:flex;flex-direction:column;gap:8px}
+  canvas#main{background:#0b0f1f;border:1px dashed #444;border-radius:10px;display:block;max-width:100%}
+  .tiny{font-size:12px;color:#aaa}
 </style>
 </head>
 <body>
-<header>
-  <h1>Generator układów 50×70 cm</h1>
-  <span class="tag">pole: 360×155 cm → 720×310 px</span>
-  <span class="tag">odstęp: 2.5 cm → 5 px</span>
-</header>
-
+<header><h1>Symetryczne układy obrazów (50×70 cm)</h1></header>
 <main>
   <section class="panel">
-    <h2>Układy (lista & miniatury)</h2>
-    <div class="row">
-      <label for="layoutSelect">Wybierz układ:</label>
-      <select id="layoutSelect"></select>
-    </div>
+    <h2>Dostępne układy</h2>
+    <select id="layoutSelect"></select>
     <div class="thumbs" id="thumbs"></div>
-    <div class="help" style="margin-top:10px">
-      <div class="legend" style="margin-bottom:6px">
-        <span class="chip"><span class="sw p"></span> Pion (100×140 px)</span>
-        <span class="chip"><span class="sw l"></span> Poziom (140×100 px)</span>
-      </div>
-      <p>
-        Kliknij miniaturę albo wybierz z listy, by załadować układ.  
-        Generowane są wszystkie układy mieszczące się w polu (min. 6 prostokątów).
-      </p>
-    </div>
   </section>
-
   <section class="panel workspace">
-    <div class="flex">
-      <button id="resetBtn" class="btn-blue">Reset do układu</button>
-      <button id="rotateBtn" class="btn-accent">Obróć zaznaczony (90°)</button>
-      <span class="tiny">Kliknij aby zaznaczyć, przeciągaj myszką, przycisk do obrotu.</span>
+    <div>
+      <button id="resetBtn">Reset</button>
+      <button id="rotateBtn">Obróć zaznaczony</button>
+      <span class="tiny">Kliknij obraz, przeciągnij lub obróć</span>
     </div>
-    <div class="canvas-wrap">
-      <canvas id="main" width="720" height="310"></canvas>
-    </div>
+    <canvas id="main" width="720" height="310"></canvas>
   </section>
 </main>
 
 <script>
 (function(){
-  const FIELD_W = 720, FIELD_H = 310, GAP = 5;
-  const P_SIZE = { w: 100, h: 140 }; // pion
-  const L_SIZE = { w: 140, h: 100 }; // poziom
-  const MIN_RECT_COUNT = 6;
+  const FIELD_W=720, FIELD_H=310, GAP=5;
+  const P={w:100,h:140}, L={w:140,h:100};
+  const MIN=6;
 
-  const layoutSelect = document.getElementById('layoutSelect');
-  const thumbsWrap = document.getElementById('thumbs');
-  const canvas = document.getElementById('main');
-  const ctx = canvas.getContext('2d');
-  const resetBtn = document.getElementById('resetBtn');
-  const rotateBtn = document.getElementById('rotateBtn');
+  const layoutSelect=document.getElementById("layoutSelect");
+  const thumbs=document.getElementById("thumbs");
+  const canvas=document.getElementById("main");
+  const ctx=canvas.getContext("2d");
+  const resetBtn=document.getElementById("resetBtn");
+  const rotateBtn=document.getElementById("rotateBtn");
 
-  let layouts = [], currentLayoutId=null, rects=[], baseRects=[], selectedId=null, undoStack=[];
+  let layouts=[], currentId=null, rects=[], baseRects=[], selected=null;
 
-  // --- generator rzędów ---
-  function generateRowCombos(){
-    const maxPerRow = 6; // 720 / (100+5) = 6.8 -> max 6 P; 720 / (140+5)=5.1 -> max 5 L
-    const results = [];
-    function backtrack(seq, totalW){
-      if(seq.length>0){
-        results.push(seq.slice());
-      }
-      if(seq.length>=maxPerRow) return;
-      for(const ori of ['P','L']){
-        const size = (ori==='P'?P_SIZE:L_SIZE);
-        const newW = totalW + (seq.length>0?GAP:0) + size.w;
-        if(newW<=FIELD_W) backtrack(seq.concat(ori), newW);
-      }
-    }
-    backtrack([],0);
-    return results;
-  }
+  // --- funkcje pomocnicze ---
+  function rowWidth(n,ori){const size=(ori==='P'?P:L);return n*size.w+(n-1)*GAP;}
+  function rowHeight(ori){return ori==='P'?P.h:L.h;}
 
-  function rowHeight(seq){
-    if(!seq.length) return 0;
-    return seq.reduce((h,ori)=>Math.max(h, ori==='P'?P_SIZE.h:L_SIZE.h),0);
-  }
-
-  function generateAllLayouts(){
-    const rowVariants = generateRowCombos();
-    const layouts = [];
-    let idc=0;
-    function backtrack(rows, totalH, rects){
-      if(rows.length>0 && rects.length>=MIN_RECT_COUNT){
-        layouts.push({id:`L${idc++}`, rows:rows.map(r=>r.seq), count:rects.length, rects:[...rects]});
-      }
-      if(rows.length>=3) return; // max 3 rzędy
-      for(const seq of rowVariants){
-        const h = rowHeight(seq);
-        const newH = totalH + (rows.length>0?GAP:0) + h;
-        if(newH>FIELD_H) continue;
-        // dodaj prostokąty
-        const y = totalH + (rows.length>0?GAP:0);
-        const newRects = [];
-        let x=0;
-        seq.forEach((ori,i)=>{
-          const size=(ori==='P'?P_SIZE:L_SIZE);
-          newRects.push({id:`r${rows.length}_${i}`, x, y, w:size.w,h:size.h, ori});
-          x += size.w + GAP;
-        });
-        backtrack(rows.concat([{seq}]), newH, rects.concat(newRects));
+  // generowanie ładnych układów
+  function generateLayouts(){
+    let list=[],idc=0;
+    for(const ori of ['P','L']){
+      const size=(ori==='P'?P:L);
+      const maxCols=Math.floor((FIELD_W+GAP)/(size.w+GAP));
+      for(let cols=2;cols<=maxCols;cols++){
+        for(let rows=1;rows<=3;rows++){
+          const h=rows*size.h+(rows-1)*GAP;
+          if(h>FIELD_H)continue;
+          const count=cols*rows;
+          if(count<MIN)continue;
+          let rects=[];let y=(FIELD_H-h)/2;
+          for(let r=0;r<rows;r++){
+            const w=rowWidth(cols,ori);
+            let x=(FIELD_W-w)/2;
+            for(let c=0;c<cols;c++){
+              rects.push({id:`r${r}_${c}`,x,y,w:size.w,h:size.h,ori});
+              x+=size.w+GAP;
+            }
+            y+=size.h+GAP;
+          }
+          list.push({id:`L${idc++}`,desc:`${rows}×${cols} ${ori}`,count,rects});
+        }
       }
     }
-    backtrack([],0,[]);
-    return layouts;
+    // kombinacje mieszane: np. rząd P nad rzędem L
+    const mixes=[['P','L'],['L','P']];
+    mixes.forEach(seq=>{
+      const h=rowHeight(seq[0])+rowHeight(seq[1])+GAP;
+      if(h>FIELD_H)return;
+      let rects=[];let y=(FIELD_H-h)/2;
+      seq.forEach(ori=>{
+        const size=(ori==='P'?P:L);
+        const maxCols=Math.floor((FIELD_W+GAP)/(size.w+GAP));
+        const cols=maxCols-1; // żeby zostawić margines
+        if(cols<2)return;
+        const w=rowWidth(cols,ori);
+        let x=(FIELD_W-w)/2;
+        for(let c=0;c<cols;c++){
+          rects.push({id:`mix_${ori}_${c}_${y}`,x,y,w:size.w,h:size.h,ori});
+          x+=size.w+GAP;
+        }
+        y+=size.h+GAP;
+      });
+      if(rects.length>=MIN){
+        list.push({id:`L${idc++}`,desc:`Mix ${seq.join('+')}`,count:rects.length,rects});
+      }
+    });
+    return list;
   }
 
   function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="#0b0f1f"; ctx.fillRect(0,0,FIELD_W,FIELD_H);
-    ctx.strokeStyle="#262b43"; ctx.lineWidth=2; ctx.strokeRect(0.5,0.5,FIELD_W-1,FIELD_H-1);
+    ctx.clearRect(0,0,FIELD_W,FIELD_H);
+    ctx.fillStyle="#0b0f1f";ctx.fillRect(0,0,FIELD_W,FIELD_H);
     rects.forEach(r=>{
-      const grad=ctx.createLinearGradient(r.x,r.y,r.x,r.y+r.h);
-      if(r.ori==='P'){grad.addColorStop(0,'#2a3c7a'); grad.addColorStop(1,'#203060');}
-      else{grad.addColorStop(0,'#2a7a52'); grad.addColorStop(1,'#1e6242');}
-      ctx.fillStyle=grad; ctx.fillRect(r.x,r.y,r.w,r.h);
-      ctx.strokeStyle=(r.id===selectedId?'#ffd166':'#3a4060'); ctx.lineWidth=2;
-      ctx.strokeRect(r.x+0.5,r.y+0.5,r.w-1,r.h-1);
+      ctx.fillStyle=(r.ori==='P'?"#2a3c7a":"#2a7a52");
+      ctx.fillRect(r.x,r.y,r.w,r.h);
+      ctx.strokeStyle=(r.id===selected?"#ffd166":"#444");
+      ctx.lineWidth=2;ctx.strokeRect(r.x+0.5,r.y+0.5,r.w-1,r.h-1);
     });
   }
 
-  function makeThumb(layout){
-    const TW=200, scale=TW/FIELD_W, TH=Math.round(FIELD_H*scale);
-    const c=document.createElement('canvas'); c.width=TW;c.height=TH; const tctx=c.getContext('2d');
-    tctx.fillStyle="#0b0f1f"; tctx.fillRect(0,0,TW,TH);
-    tctx.strokeStyle="#262b43"; tctx.strokeRect(0.5,0.5,TW-1,TH-1);
-    layout.rects.forEach(r=>{
-      const x=r.x*scale,y=r.y*scale,w=r.w*scale,h=r.h*scale;
-      tctx.fillStyle=(r.ori==='P'?'#2b3f86':'#2c8a5a'); tctx.fillRect(x,y,w,h);
-      tctx.strokeStyle='#3a4060'; tctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
-    });
-    const wrap=document.createElement('div'); wrap.className='thumb';
-    wrap.appendChild(c);
-    const meta=document.createElement('div'); meta.className='meta';
-    meta.textContent=`Rzędy: [${layout.rows.map(r=>r.join('')).join(' | ')}] • sztuk: ${layout.count}`;
-    wrap.appendChild(meta);
-    wrap.addEventListener('click',()=>{layoutSelect.value=layout.id; loadLayout(layout.id);});
+  function makeThumb(l){
+    const TW=140,scale=TW/FIELD_W,TH=FIELD_H*scale;
+    const c=document.createElement("canvas");c.width=TW;c.height=TH;const t=c.getContext("2d");
+    t.fillStyle="#0b0f1f";t.fillRect(0,0,TW,TH);t.strokeStyle="#333";t.strokeRect(0.5,0.5,TW-1,TH-1);
+    l.rects.forEach(r=>{t.fillStyle=(r.ori==='P'?"#2a3c7a":"#2a7a52");t.fillRect(r.x*scale,r.y*scale,r.w*scale,r.h*scale);});
+    const wrap=document.createElement("div");wrap.className="thumb";wrap.appendChild(c);
+    wrap.addEventListener("click",()=>{layoutSelect.value=l.id;loadLayout(l.id);});
     return wrap;
   }
 
   function loadLayout(id){
-    const lay=layouts.find(l=>l.id===id); if(!lay)return;
-    currentLayoutId=id; rects=lay.rects.map(r=>({...r})); baseRects=lay.rects.map(r=>({...r})); selectedId=null; draw();
+    const lay=layouts.find(l=>l.id===id);if(!lay)return;
+    currentId=id;rects=lay.rects.map(r=>({...r}));baseRects=lay.rects.map(r=>({...r}));selected=null;draw();
   }
 
   // interakcje
-  let dragging=null;
-  function hitTest(x,y){for(let i=rects.length-1;i>=0;i--){const r=rects[i];if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return r.id;}return null;}
-  canvas.addEventListener('mousedown',e=>{
-    const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*(canvas.width/rect.width),y=(e.clientY-rect.top)*(canvas.height/rect.height);
-    const id=hitTest(x,y); if(id){selectedId=id;const r=rects.find(rr=>rr.id===id);dragging={id,offX:x-r.x,offY:y-r.y};draw();}else{selectedId=null;draw();}
+  function hit(x,y){for(let i=rects.length-1;i>=0;i--){let r=rects[i];if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return r.id;}return null;}
+  let drag=null;
+  canvas.addEventListener("mousedown",e=>{
+    const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*(canvas.width/r.width),y=(e.clientY-r.top)*(canvas.height/r.height);
+    const id=hit(x,y);if(id){selected=id;const rr=rects.find(z=>z.id===id);drag={id,dx:x-rr.x,dy:y-rr.y};}else selected=null;draw();
   });
-  window.addEventListener('mousemove',e=>{
-    if(!dragging)return;const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*(canvas.width/rect.width),y=(e.clientY-rect.top)*(canvas.height/rect.height);
-    const r=rects.find(rr=>rr.id===dragging.id);if(!r)return;let nx=x-dragging.offX,ny=y-dragging.offY;nx=Math.max(0,Math.min(FIELD_W-r.w,nx));ny=Math.max(0,Math.min(FIELD_H-r.h,ny));r.x=nx;r.y=ny;draw();
+  window.addEventListener("mousemove",e=>{
+    if(!drag)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*(canvas.width/r.width),y=(e.clientY-r.top)*(canvas.height/r.height);
+    const rr=rects.find(z=>z.id===drag.id);if(!rr)return;rr.x=Math.max(0,Math.min(FIELD_W-rr.w,x-drag.dx));rr.y=Math.max(0,Math.min(FIELD_H-rr.h,y-drag.dy));draw();
   });
-  window.addEventListener('mouseup',()=>dragging=null);
-  rotateBtn.addEventListener('click',()=>{
-    if(!selectedId)return;const r=rects.find(rr=>rr.id===selectedId);if(!r)return;
-    const cx=r.x+r.w/2,cy=r.y+r.h/2;const newW=r.h,newH=r.w;r.ori=(r.ori==='P'?'L':'P');r.w=newW;r.h=newH;r.x=Math.max(0,Math.min(FIELD_W-r.w,Math.round(cx-r.w/2)));r.y=Math.max(0,Math.min(FIELD_H-r.h,Math.round(cy-r.h/2)));draw();
+  window.addEventListener("mouseup",()=>drag=null);
+  rotateBtn.addEventListener("click",()=>{
+    if(!selected)return;const r=rects.find(z=>z.id===selected);if(!r)return;const cx=r.x+r.w/2,cy=r.y+r.h/2;const nw=r.h,nh=r.w;r.ori=(r.ori==='P'?'L':'P');r.w=nw;r.h=nh;r.x=Math.round(cx-nw/2);r.y=Math.round(cy-nh/2);draw();
   });
-  resetBtn.addEventListener('click',()=>{if(!currentLayoutId)return;rects=baseRects.map(r=>({...r}));selectedId=null;draw();});
+  resetBtn.addEventListener("click",()=>{if(!currentId)return;const lay=layouts.find(l=>l.id===currentId);rects=lay.rects.map(r=>({...r}));selected=null;draw();});
 
   function init(){
-    layouts=generateAllLayouts();
-    layoutSelect.innerHTML=''; thumbsWrap.innerHTML='';
-    layouts.forEach(l=>{const opt=document.createElement('option');opt.value=l.id;opt.textContent=`${l.rows.map(r=>r.join('')).join(' | ')} (${l.count})`;layoutSelect.appendChild(opt);thumbsWrap.appendChild(makeThumb(l));});
-    if(layouts.length){layoutSelect.value=layouts[0].id; loadLayout(layouts[0].id);}
+    layouts=generateLayouts();layoutSelect.innerHTML="";thumbs.innerHTML="";
+    layouts.forEach(l=>{const o=document.createElement("option");o.value=l.id;o.textContent=`${l.desc} (${l.count})`;layoutSelect.appendChild(o);thumbs.appendChild(makeThumb(l));});
+    if(layouts.length){layoutSelect.value=layouts[0].id;loadLayout(layouts[0].id);}
   }
   init();
 })();
 </script>
 </body>
 </html>
+
