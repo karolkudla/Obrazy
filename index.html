@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Układy prostokątów – wersja estetyczna</title>
+<title>Symetryczne układy obrazów</title>
 <style>
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#0d1020;color:#eee;display:flex;flex-direction:column;min-height:100vh}
   header{padding:12px 20px;background:#14182a;border-bottom:1px solid #262b43;position:sticky;top:0}
@@ -55,12 +55,13 @@
 
   let layouts=[], currentId=null, rects=[], baseRects=[], selected=null;
 
-  // --- funkcje pomocnicze ---
-  function rowWidth(n,ori){const size=(ori==='P'?P:L);return n*size.w+(n-1)*GAP;}
+  function rowWidth(seq){
+    return seq.reduce((acc,ori)=>acc+(ori==='P'?P.w:L.w)+GAP, -GAP);
+  }
   function rowHeight(ori){return ori==='P'?P.h:L.h;}
 
-  // generowanie ładnych układów
-  function generateLayouts(){
+  // --- GENERATORY ---
+  function generateGridLayouts(){
     let list=[],idc=0;
     for(const ori of ['P','L']){
       const size=(ori==='P'?P:L);
@@ -73,7 +74,7 @@
           if(count<MIN)continue;
           let rects=[];let y=(FIELD_H-h)/2;
           for(let r=0;r<rows;r++){
-            const w=rowWidth(cols,ori);
+            const w=rowWidth(Array(cols).fill(ori));
             let x=(FIELD_W-w)/2;
             for(let c=0;c<cols;c++){
               rects.push({id:`r${r}_${c}`,x,y,w:size.w,h:size.h,ori});
@@ -81,11 +82,15 @@
             }
             y+=size.h+GAP;
           }
-          list.push({id:`L${idc++}`,desc:`${rows}×${cols} ${ori}`,count,rects});
+          list.push({id:`G${idc++}`,desc:`Siatka ${rows}×${cols} ${ori}`,count,rects});
         }
       }
     }
-    // kombinacje mieszane: np. rząd P nad rzędem L
+    return list;
+  }
+
+  function generateMixRows(){
+    let list=[],idc=0;
     const mixes=[['P','L'],['L','P']];
     mixes.forEach(seq=>{
       const h=rowHeight(seq[0])+rowHeight(seq[1])+GAP;
@@ -94,9 +99,8 @@
       seq.forEach(ori=>{
         const size=(ori==='P'?P:L);
         const maxCols=Math.floor((FIELD_W+GAP)/(size.w+GAP));
-        const cols=maxCols-1; // żeby zostawić margines
-        if(cols<2)return;
-        const w=rowWidth(cols,ori);
+        const cols=Math.max(2,maxCols-1);
+        const w=rowWidth(Array(cols).fill(ori));
         let x=(FIELD_W-w)/2;
         for(let c=0;c<cols;c++){
           rects.push({id:`mix_${ori}_${c}_${y}`,x,y,w:size.w,h:size.h,ori});
@@ -105,12 +109,50 @@
         y+=size.h+GAP;
       });
       if(rects.length>=MIN){
-        list.push({id:`L${idc++}`,desc:`Mix ${seq.join('+')}`,count:rects.length,rects});
+        list.push({id:`M${idc++}`,desc:`Mix ${seq.join('+')}`,count:rects.length,rects});
       }
     });
     return list;
   }
 
+  function generateSymPalindromes(){
+    let list=[],idc=0;
+    for(let len=3;len<=8;len++){ // długość rzędu
+      const half=Math.floor(len/2);
+      const isOdd=(len%2===1);
+      const combos=Math.pow(2,half+(isOdd?1:0)); // wszystkie kombinacje P/L
+      for(let mask=0;mask<combos;mask++){
+        let seq=[];
+        // lewa strona
+        for(let i=0;i<half;i++){
+          seq.push(((mask>>i)&1)?'P':'L');
+        }
+        // środek
+        if(isOdd){
+          seq.push(((mask>>half)&1)?'P':'L');
+        }
+        // prawa strona = lustrzane odbicie
+        for(let i=half-1;i>=0;i--){
+          seq.push(seq[i]);
+        }
+        const w=rowWidth(seq);
+        if(w>FIELD_W)continue;
+        let h=Math.max(...seq.map(o=>rowHeight(o)));
+        if(h>FIELD_H)continue;
+        if(seq.length<MIN)continue;
+        let rects=[];let y=(FIELD_H-h)/2;let x=(FIELD_W-w)/2;
+        seq.forEach((ori,idx)=>{
+          const size=(ori==='P'?P:L);
+          rects.push({id:`pal_${idc}_${idx}`,x,y,w:size.w,h:size.h,ori});
+          x+=size.w+GAP;
+        });
+        list.push({id:`P${idc++}`,desc:`Palindrom ${seq.join('')}`,count:seq.length,rects});
+      }
+    }
+    return list;
+  }
+
+  // --- RYSOWANIE ---
   function draw(){
     ctx.clearRect(0,0,FIELD_W,FIELD_H);
     ctx.fillStyle="#0b0f1f";ctx.fillRect(0,0,FIELD_W,FIELD_H);
@@ -137,7 +179,7 @@
     currentId=id;rects=lay.rects.map(r=>({...r}));baseRects=lay.rects.map(r=>({...r}));selected=null;draw();
   }
 
-  // interakcje
+  // --- INTERAKCJE ---
   function hit(x,y){for(let i=rects.length-1;i>=0;i--){let r=rects[i];if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return r.id;}return null;}
   let drag=null;
   canvas.addEventListener("mousedown",e=>{
@@ -154,8 +196,10 @@
   });
   resetBtn.addEventListener("click",()=>{if(!currentId)return;const lay=layouts.find(l=>l.id===currentId);rects=lay.rects.map(r=>({...r}));selected=null;draw();});
 
+  // --- INIT ---
   function init(){
-    layouts=generateLayouts();layoutSelect.innerHTML="";thumbs.innerHTML="";
+    layouts=[...generateGridLayouts(),...generateMixRows(),...generateSymPalindromes()];
+    layoutSelect.innerHTML="";thumbs.innerHTML="";
     layouts.forEach(l=>{const o=document.createElement("option");o.value=l.id;o.textContent=`${l.desc} (${l.count})`;layoutSelect.appendChild(o);thumbs.appendChild(makeThumb(l));});
     if(layouts.length){layoutSelect.value=layouts[0].id;loadLayout(layouts[0].id);}
   }
@@ -164,4 +208,3 @@
 </script>
 </body>
 </html>
-
