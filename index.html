@@ -34,7 +34,6 @@
   button:hover{transform: translateY(-1px)}
   .btn-accent{border-color:#2b7a4b; background:#15321f}
   .btn-blue{border-color:#2b4f7a; background:#13263a}
-  .btn-warn{border-color:#7a5b2b; background:#2a2113}
   .controls{display:flex; flex-wrap:wrap; gap:8px}
   .row{display:flex; flex-direction:column; gap:6px; margin-bottom:10px}
   .tiny{font-size:12px; color:var(--muted)}
@@ -70,14 +69,13 @@
   <h1>Generator układów 50×70 cm</h1>
   <span class="tag">pole: 360×155 cm → 720×310 px</span>
   <span class="tag">odstęp: 2.5 cm → 5 px</span>
-  <span class="tag">max sztuk: 15</span>
 </header>
 
 <main>
   <section class="panel">
     <h2>Układy (lista & miniatury)</h2>
     <div class="row">
-      <label for="layoutSelect">Wybierz układ (maksymalne):</label>
+      <label for="layoutSelect">Wybierz układ:</label>
       <select id="layoutSelect"></select>
     </div>
     <div class="thumbs" id="thumbs"></div>
@@ -88,7 +86,7 @@
       </div>
       <p>
         Kliknij miniaturę albo wybierz z listy, by załadować układ.  
-        Maksymalna liczba prostokątów dla tych parametrów to 15 (3×5 poziomo).
+        Generowane są wszystkie układy mieszczące się w polu (min. 6 prostokątów).
       </p>
     </div>
   </section>
@@ -97,29 +95,21 @@
     <div class="flex">
       <button id="resetBtn" class="btn-blue">Reset do układu</button>
       <button id="rotateBtn" class="btn-accent">Obróć zaznaczony (90°)</button>
-      <span class="tiny">Zaznacz: kliknięcie. Przesuwanie: przeciągnij. Nadpisywanie / nakładanie dozwolone.</span>
+      <span class="tiny">Kliknij aby zaznaczyć, przeciągaj myszką, przycisk do obrotu.</span>
     </div>
     <div class="canvas-wrap">
       <canvas id="main" width="720" height="310"></canvas>
-    </div>
-    <div class="help">
-      <span class="kbd">Shift</span> przy przeciąganiu → ruch w poziomie/pionie (snap osiowy).  
-      <span class="kbd">Del</span> – usuń zaznaczony (jeśli chcesz miejsce), <span class="kbd">Ctrl/Cmd + Z</span> – cofaj.  
-      Krawędzie nie wymagają odstępów: odstęp dotyczy tylko prostokąt-prostokąt.
     </div>
   </section>
 </main>
 
 <script>
 (function(){
-  // --- Stałe (skala cm->px już zaszyta) ---
-  const FIELD_W = 720;   // 360 cm * 2
-  const FIELD_H = 310;   // 155 cm * 2
-  const GAP = 5;         // 2.5 cm * 2
+  const FIELD_W = 720, FIELD_H = 310, GAP = 5;
   const P_SIZE = { w: 100, h: 140 }; // pion
   const L_SIZE = { w: 140, h: 100 }; // poziom
+  const MIN_RECT_COUNT = 6;
 
-  // DOM
   const layoutSelect = document.getElementById('layoutSelect');
   const thumbsWrap = document.getElementById('thumbs');
   const canvas = document.getElementById('main');
@@ -127,307 +117,123 @@
   const resetBtn = document.getElementById('resetBtn');
   const rotateBtn = document.getElementById('rotateBtn');
 
-  // Stan
-  let layouts = [];          // [{id, rows:['L','L','L'], rects:[{x,y,w,h,ori,id}], count}]
-  let currentLayoutId = null;
-  let rects = [];            // bieżące prostokąty na canvasie (edytowalne)
-  let baseRects = [];        // kopia układu bazowego do Reset
-  let selectedId = null;
-  let undoStack = [];
+  let layouts = [], currentLayoutId=null, rects=[], baseRects=[], selectedId=null, undoStack=[];
 
-  // --- Generowanie sekwencji rzędów i układów ---
-  function fitRows(rows){
-    // Sprawdza, czy rzędy mieszczą się pionowo (sumy wysokości + odstępy)
-    const heights = rows.map(r => r==='P' ? P_SIZE.h : L_SIZE.h);
-    const sumH = heights.reduce((a,b)=>a+b,0);
-    const totalH = sumH + GAP * Math.max(0, rows.length - 1);
-    return totalH <= FIELD_H;
-  }
-  function countInRow(ori){
-    const w = (ori==='P' ? P_SIZE.w : L_SIZE.w);
-    return Math.floor((FIELD_W + GAP) / (w + GAP));
-  }
-  function layoutRectsFromRows(rows){
-    // Tworzy prostokąty w siatce (bez nakładania, idealny układ)
-    const rects = [];
-    let y = 0;
-    rows.forEach((r, ri)=>{
-      const size = (r==='P' ? P_SIZE : L_SIZE);
-      const n = countInRow(r);
-      const rowY = y;
-      // x początkowe: układ "od lewej", bo przy L wypełni dokładnie do prawej
-      let x = 0;
-      for(let i=0;i<n;i++){
-        rects.push({
-          id: `r${ri}_${i}`,
-          x, y: rowY, w: size.w, h: size.h, ori: r
-        });
-        x += size.w + (i < n-1 ? GAP : 0);
+  // --- generator rzędów ---
+  function generateRowCombos(){
+    const maxPerRow = 6; // 720 / (100+5) = 6.8 -> max 6 P; 720 / (140+5)=5.1 -> max 5 L
+    const results = [];
+    function backtrack(seq, totalW){
+      if(seq.length>0){
+        results.push(seq.slice());
       }
-      y += size.h + (ri < rows.length-1 ? GAP : 0);
-    });
-    return rects;
+      if(seq.length>=maxPerRow) return;
+      for(const ori of ['P','L']){
+        const size = (ori==='P'?P_SIZE:L_SIZE);
+        const newW = totalW + (seq.length>0?GAP:0) + size.w;
+        if(newW<=FIELD_W) backtrack(seq.concat(ori), newW);
+      }
+    }
+    backtrack([],0);
+    return results;
   }
+
+  function rowHeight(seq){
+    if(!seq.length) return 0;
+    return seq.reduce((h,ori)=>Math.max(h, ori==='P'?P_SIZE.h:L_SIZE.h),0);
+  }
+
   function generateAllLayouts(){
-    const sequences = [];
-    const ORIS = ['P','L'];
-    // Teoretycznie maks. w pionie wejdą 3 rzędy (100+5+100+5+100=310), 4 już nie
-    for(let len=1; len<=3; len++){
-      const rec = (prefix=[])=>{
-        if(prefix.length===len){
-          if(fitRows(prefix)) sequences.push(prefix.slice());
-          return;
-        }
-        for(const o of ORIS) rec(prefix.concat(o));
-      };
-      rec([]);
-    }
-    // Zlicz i zbuduj układy
-    const layouts = sequences.map((rows, idx)=>{
-      const perRow = rows.map(r => countInRow(r));
-      const total = perRow.reduce((a,b)=>a+b,0);
-      return {
-        id: `L${idx}`,
-        rows,
-        count: total,
-        rects: layoutRectsFromRows(rows)
-      };
-    });
-    // Maksymalne tylko (wymóg)
-    const maxCount = layouts.reduce((m,l)=>Math.max(m,l.count),0);
-    return layouts.filter(l => l.count === maxCount);
-  }
-
-  // --- Render główny ---
-  function draw(){
-    // Tło pola roboczego
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    // Tło + kratka delikatna (co 50 px) dla orientacji
-    ctx.save();
-    ctx.fillStyle = "#0b0f1f";
-    ctx.fillRect(0,0,FIELD_W,FIELD_H);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 1;
-    for(let x=50; x<FIELD_W; x+=50){
-      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,FIELD_H); ctx.stroke();
-    }
-    for(let y=50; y<FIELD_H; y+=50){
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(FIELD_W,y); ctx.stroke();
-    }
-    ctx.restore();
-
-    // Ramka
-    ctx.strokeStyle = "#262b43";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0.5,0.5,FIELD_W-1,FIELD_H-1);
-
-    // Prostokąty
-    rects.forEach(r=>{
-      const isSel = r.id === selectedId;
-      // wypełnienie wg orientacji
-      const grad = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
-      if(r.ori === 'P'){
-        grad.addColorStop(0, '#2a3c7a');
-        grad.addColorStop(1, '#203060');
-      } else {
-        grad.addColorStop(0, '#2a7a52');
-        grad.addColorStop(1, '#1e6242');
+    const rowVariants = generateRowCombos();
+    const layouts = [];
+    let idc=0;
+    function backtrack(rows, totalH, rects){
+      if(rows.length>0 && rects.length>=MIN_RECT_COUNT){
+        layouts.push({id:`L${idc++}`, rows:rows.map(r=>r.seq), count:rects.length, rects:[...rects]});
       }
-      ctx.fillStyle = grad;
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      // obrys
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = isSel ? '#ffd166' : '#3a4060';
-      ctx.strokeRect(r.x+0.5, r.y+0.5, r.w-1, r.h-1);
+      if(rows.length>=3) return; // max 3 rzędy
+      for(const seq of rowVariants){
+        const h = rowHeight(seq);
+        const newH = totalH + (rows.length>0?GAP:0) + h;
+        if(newH>FIELD_H) continue;
+        // dodaj prostokąty
+        const y = totalH + (rows.length>0?GAP:0);
+        const newRects = [];
+        let x=0;
+        seq.forEach((ori,i)=>{
+          const size=(ori==='P'?P_SIZE:L_SIZE);
+          newRects.push({id:`r${rows.length}_${i}`, x, y, w:size.w,h:size.h, ori});
+          x += size.w + GAP;
+        });
+        backtrack(rows.concat([{seq}]), newH, rects.concat(newRects));
+      }
+    }
+    backtrack([],0,[]);
+    return layouts;
+  }
 
-      // uchwyt nazwy (mały)
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
-      ctx.font = '12px ui-monospace, monospace';
-      ctx.fillText(`${r.w}×${r.h}`, r.x+6, r.y+16);
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#0b0f1f"; ctx.fillRect(0,0,FIELD_W,FIELD_H);
+    ctx.strokeStyle="#262b43"; ctx.lineWidth=2; ctx.strokeRect(0.5,0.5,FIELD_W-1,FIELD_H-1);
+    rects.forEach(r=>{
+      const grad=ctx.createLinearGradient(r.x,r.y,r.x,r.y+r.h);
+      if(r.ori==='P'){grad.addColorStop(0,'#2a3c7a'); grad.addColorStop(1,'#203060');}
+      else{grad.addColorStop(0,'#2a7a52'); grad.addColorStop(1,'#1e6242');}
+      ctx.fillStyle=grad; ctx.fillRect(r.x,r.y,r.w,r.h);
+      ctx.strokeStyle=(r.id===selectedId?'#ffd166':'#3a4060'); ctx.lineWidth=2;
+      ctx.strokeRect(r.x+0.5,r.y+0.5,r.w-1,r.h-1);
     });
   }
 
-  // --- Miniatury ---
   function makeThumb(layout){
-    const TW = 240; // szerokość miniatury
-    const scale = TW / FIELD_W;
-    const TH = Math.round(FIELD_H * scale);
-    const c = document.createElement('canvas');
-    c.width = TW; c.height = TH;
-    const tctx = c.getContext('2d');
-
-    // tło
-    tctx.fillStyle = "#0b0f1f";
-    tctx.fillRect(0,0,TW,TH);
-    // ramka
-    tctx.strokeStyle = "#262b43";
-    tctx.lineWidth = 1;
-    tctx.strokeRect(0.5,0.5,TW-1,TH-1);
-
+    const TW=200, scale=TW/FIELD_W, TH=Math.round(FIELD_H*scale);
+    const c=document.createElement('canvas'); c.width=TW;c.height=TH; const tctx=c.getContext('2d');
+    tctx.fillStyle="#0b0f1f"; tctx.fillRect(0,0,TW,TH);
+    tctx.strokeStyle="#262b43"; tctx.strokeRect(0.5,0.5,TW-1,TH-1);
     layout.rects.forEach(r=>{
-      const x = Math.round(r.x * scale);
-      const y = Math.round(r.y * scale);
-      const w = Math.round(r.w * scale);
-      const h = Math.round(r.h * scale);
-      tctx.fillStyle = r.ori==='P' ? '#2b3f86' : '#2c8a5a';
-      tctx.fillRect(x, y, w, h);
-      tctx.strokeStyle = '#3a4060';
-      tctx.strokeRect(x+0.5, y+0.5, w-1, h-1);
+      const x=r.x*scale,y=r.y*scale,w=r.w*scale,h=r.h*scale;
+      tctx.fillStyle=(r.ori==='P'?'#2b3f86':'#2c8a5a'); tctx.fillRect(x,y,w,h);
+      tctx.strokeStyle='#3a4060'; tctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
     });
-
-    const wrap = document.createElement('div');
-    wrap.className = 'thumb';
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    meta.textContent = `Rzędy: [${layout.rows.join(', ')}] • sztuk: ${layout.count}`;
+    const wrap=document.createElement('div'); wrap.className='thumb';
     wrap.appendChild(c);
+    const meta=document.createElement('div'); meta.className='meta';
+    meta.textContent=`Rzędy: [${layout.rows.map(r=>r.join('')).join(' | ')}] • sztuk: ${layout.count}`;
     wrap.appendChild(meta);
-    wrap.addEventListener('click', ()=>{
-      layoutSelect.value = layout.id;
-      loadLayout(layout.id, true);
-    });
+    wrap.addEventListener('click',()=>{layoutSelect.value=layout.id; loadLayout(layout.id);});
     return wrap;
   }
 
-  // --- Ładowanie układu ---
-  function loadLayout(id, pushUndo=false){
-    const lay = layouts.find(l => l.id === id);
-    if(!lay) return;
-    currentLayoutId = id;
-    rects = lay.rects.map(r => ({...r})); // deep-ish copy
-    baseRects = lay.rects.map(r => ({...r}));
-    selectedId = null;
-    if(pushUndo) pushHistory();
-    draw();
+  function loadLayout(id){
+    const lay=layouts.find(l=>l.id===id); if(!lay)return;
+    currentLayoutId=id; rects=lay.rects.map(r=>({...r})); baseRects=lay.rects.map(r=>({...r})); selectedId=null; draw();
   }
 
-  // --- Wybór/drag/obrót/undo ---
-  let dragging = null; // {id, offX, offY, startX, startY}
-  function hitTest(x, y){
-    // od góry stosu (ostatni rysowany na końcu? my rysujemy w kolejności, więc klikamy od końca, by "na wierzchu")
-    for(let i=rects.length-1; i>=0; i--){
-      const r = rects[i];
-      if(x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h) return r.id;
-    }
-    return null;
-  }
-  function pushHistory(){
-    undoStack.push(JSON.stringify({rects, selectedId}));
-    if(undoStack.length>50) undoStack.shift();
-  }
-  function undo(){
-    const last = undoStack.pop();
-    if(!last) return;
-    const state = JSON.parse(last);
-    rects = state.rects.map(r=>({...r}));
-    selectedId = state.selectedId;
-    draw();
-  }
-
-  canvas.addEventListener('mousedown', (e)=>{
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.round((e.clientX - rect.left) * (canvas.width / rect.width));
-    const y = Math.round((e.clientY - rect.top) * (canvas.height / rect.height));
-    const id = hitTest(x,y);
-    if(id){
-      selectedId = id;
-      const r = rects.find(r=>r.id===id);
-      dragging = {
-        id, offX: x - r.x, offY: y - r.y, startX: r.x, startY: r.y, shift: e.shiftKey
-      };
-      pushHistory();
-      draw();
-    } else {
-      selectedId = null;
-      draw();
-    }
+  // interakcje
+  let dragging=null;
+  function hitTest(x,y){for(let i=rects.length-1;i>=0;i--){const r=rects[i];if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return r.id;}return null;}
+  canvas.addEventListener('mousedown',e=>{
+    const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*(canvas.width/rect.width),y=(e.clientY-rect.top)*(canvas.height/rect.height);
+    const id=hitTest(x,y); if(id){selectedId=id;const r=rects.find(rr=>rr.id===id);dragging={id,offX:x-r.x,offY:y-r.y};draw();}else{selectedId=null;draw();}
   });
-  window.addEventListener('mousemove', (e)=>{
-    if(!dragging) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.round((e.clientX - rect.left) * (canvas.width / rect.width));
-    const y = Math.round((e.clientY - rect.top) * (canvas.height / rect.height));
-    const r = rects.find(rr=>rr.id===dragging.id);
-    if(!r) return;
-    let nx = x - dragging.offX;
-    let ny = y - dragging.offY;
-    // ograniczenie do pola (bez wymuszania odstępu do krawędzi)
-    nx = Math.max(0, Math.min(FIELD_W - r.w, nx));
-    ny = Math.max(0, Math.min(FIELD_H - r.h, ny));
-    if(dragging.shift){
-      // snap osiowy – wybierz kierunek większego wychylenia
-      const dx = Math.abs(nx - dragging.startX);
-      const dy = Math.abs(ny - dragging.startY);
-      if(dx > dy) ny = dragging.startY; else nx = dragging.startX;
-    }
-    r.x = nx; r.y = ny;
-    draw();
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*(canvas.width/rect.width),y=(e.clientY-rect.top)*(canvas.height/rect.height);
+    const r=rects.find(rr=>rr.id===dragging.id);if(!r)return;let nx=x-dragging.offX,ny=y-dragging.offY;nx=Math.max(0,Math.min(FIELD_W-r.w,nx));ny=Math.max(0,Math.min(FIELD_H-r.h,ny));r.x=nx;r.y=ny;draw();
   });
-  window.addEventListener('mouseup', ()=> dragging=null);
-
-  rotateBtn.addEventListener('click', ()=>{
-    if(!selectedId) return;
-    const r = rects.find(rr=>rr.id===selectedId);
-    if(!r) return;
-    pushHistory();
-    // obróć wokół środka
-    const cx = r.x + r.w/2;
-    const cy = r.y + r.h/2;
-    // zamiana w/h i ori
-    const newW = r.h, newH = r.w;
-    r.ori = (r.ori === 'P') ? 'L' : 'P';
-    r.w = newW; r.h = newH;
-    r.x = Math.round(cx - r.w/2);
-    r.y = Math.round(cy - r.h/2);
-    // zaciśnij do pola
-    r.x = Math.max(0, Math.min(FIELD_W - r.w, r.x));
-    r.y = Math.max(0, Math.min(FIELD_H - r.h, r.y));
-    draw();
+  window.addEventListener('mouseup',()=>dragging=null);
+  rotateBtn.addEventListener('click',()=>{
+    if(!selectedId)return;const r=rects.find(rr=>rr.id===selectedId);if(!r)return;
+    const cx=r.x+r.w/2,cy=r.y+r.h/2;const newW=r.h,newH=r.w;r.ori=(r.ori==='P'?'L':'P');r.w=newW;r.h=newH;r.x=Math.max(0,Math.min(FIELD_W-r.w,Math.round(cx-r.w/2)));r.y=Math.max(0,Math.min(FIELD_H-r.h,Math.round(cy-r.h/2)));draw();
   });
+  resetBtn.addEventListener('click',()=>{if(!currentLayoutId)return;rects=baseRects.map(r=>({...r}));selectedId=null;draw();});
 
-  resetBtn.addEventListener('click', ()=>{
-    if(!currentLayoutId) return;
-    pushHistory();
-    rects = baseRects.map(r=>({...r}));
-    selectedId = null;
-    draw();
-  });
-
-  window.addEventListener('keydown', (e)=>{
-    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); }
-    if(e.key==='Delete'){
-      if(!selectedId) return;
-      pushHistory();
-      rects = rects.filter(r=>r.id!==selectedId);
-      selectedId = null;
-      draw();
-    }
-  });
-
-  // --- Inicjalizacja: generuj i zapełnij UI ---
   function init(){
-    layouts = generateAllLayouts(); // tylko maksymalne
-    // Dropdown
-    layoutSelect.innerHTML = '';
-    layouts.forEach(l=>{
-      const opt = document.createElement('option');
-      opt.value = l.id;
-      opt.textContent = `Rzędy: [${l.rows.join(', ')}] • sztuk: ${l.count}`;
-      layoutSelect.appendChild(opt);
-    });
-    layoutSelect.addEventListener('change', e=> loadLayout(e.target.value, true));
-
-    // Thumbs
-    thumbsWrap.innerHTML = '';
-    layouts.forEach(l => thumbsWrap.appendChild(makeThumb(l)));
-
-    // Start od pierwszego
-    if(layouts.length){
-      loadLayout(layouts[0].id, false);
-      layoutSelect.value = layouts[0].id;
-    }
+    layouts=generateAllLayouts();
+    layoutSelect.innerHTML=''; thumbsWrap.innerHTML='';
+    layouts.forEach(l=>{const opt=document.createElement('option');opt.value=l.id;opt.textContent=`${l.rows.map(r=>r.join('')).join(' | ')} (${l.count})`;layoutSelect.appendChild(opt);thumbsWrap.appendChild(makeThumb(l));});
+    if(layouts.length){layoutSelect.value=layouts[0].id; loadLayout(layouts[0].id);}
   }
-
   init();
 })();
 </script>
